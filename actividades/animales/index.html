@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¿Dónde viven los animales?</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0fdf4; /* Fondo verde muy clarito */
+            background-image: radial-gradient(#dcfce7 1px, transparent 1px);
+            background-size: 20px 20px;
+            touch-action: auto;
+            overflow-x: hidden;
+        }
+        
+        h1 {
+            font-family: 'Comic Neue', cursive;
+        }
+
+        /* Estilos para los animales (elementos arrastrables) */
+        .animal {
+            cursor: grab;
+            transition: transform 0.2s, box-shadow 0.2s;
+            touch-action: none; /* Crucial para drag táctil */
+            user-select: none;
+        }
+        
+        .animal:active, .animal.dragging {
+            cursor: grabbing;
+            transform: scale(1.1) rotate(-5deg);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 50; /* Para que quede por encima de todo al arrastrar */
+        }
+
+        .animal.success {
+            pointer-events: none; /* Ya no se puede mover una vez colocado */
+            animation: pop 0.5s ease-out forwards;
+        }
+
+        /* Estilos para los hábitats (zonas de destino) */
+        .habitat {
+            transition: all 0.3s;
+            border: 4px dashed transparent;
+        }
+        
+        .habitat.drag-over {
+            transform: scale(1.05);
+            border-color: rgba(255, 255, 255, 0.8);
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.5);
+        }
+
+        .habitat.matched {
+            border: 4px solid white;
+            box-shadow: 0 0 15px rgba(255,255,255,0.8);
+        }
+
+        /* Animación de celebración */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2) rotate(5deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        /* Animación de confeti (se añade por JS) */
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #fcd34d;
+            opacity: 0;
+            border-radius: 50%;
+        }
+
+        /* Mensaje final */
+        #celebration-overlay {
+            display: none;
+            backdrop-filter: blur(5px);
+        }
+        #celebration-overlay.show {
+            display: flex;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Asegurar que las imágenes no interfieran con el arrastre */
+        .animal img, .animal svg, .animal span {
+            pointer-events: none; 
+        }
+        @keyframes shake { 25%,75% {transform:translateX(-6px)} 50% {transform:translateX(6px)} }
+        @keyframes sparkle { from {opacity:1;transform:scale(.5)} to {opacity:0;transform:scale(1.5)} }
+        @media (max-width:639px) {
+            #animals-container {gap:.5rem;min-height:90px}
+            .animal {width:80px;height:90px;padding:.5rem}
+            .animal > div {font-size:2rem}
+            .animal span {font-size:1rem}
+            .habitat {min-height:125px;padding:.5rem}
+            .habitat h2 {margin-bottom:.25rem;font-size:1.25rem;padding:.25rem 1rem}
+            header {margin-bottom:1rem!important}
+            main {gap:.75rem!important}
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 sm:p-8">
+
+    <a href="../../index.html" class="text-emerald-800 underline font-bold mb-4">← Todas las actividades</a>
+    <header class="text-center mb-8 z-10 relative">
+        <h1 class="text-4xl sm:text-5xl md:text-6xl text-emerald-800 font-bold mb-2 drop-shadow-md">
+            ¡Descubre su Hogar!
+        </h1>
+        <p class="text-lg sm:text-xl text-emerald-600 font-semibold bg-white/80 px-6 py-2 rounded-full inline-block shadow-sm">
+            Arrastra cada animalito a su lugar favorito.
+        </p>
+    </header>
+
+    <main class="w-full max-w-5xl flex flex-col gap-8 flex-grow">
+        
+        <!-- Zona de Animales (Arrastrables) -->
+        <section class="flex flex-wrap justify-center gap-6 sm:gap-12 z-20 relative min-h-[150px]" id="animals-container">
+            <!-- Animal: Pájaro (Aire) -->
+            <div class="animal bg-white p-4 rounded-3xl shadow-lg border-b-4 border-slate-200 flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40" 
+                 id="animal-bird" data-target="habitat-air" draggable="true">
+                <div class="text-5xl sm:text-7xl mb-2">🦅</div>
+                <span class="text-slate-700 font-bold text-lg sm:text-xl">Águila</span>
+            </div>
+
+            <!-- Animal: Perro (Tierra) -->
+            <div class="animal bg-white p-4 rounded-3xl shadow-lg border-b-4 border-slate-200 flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40" 
+                 id="animal-dog" data-target="habitat-land" draggable="true">
+                <div class="text-5xl sm:text-7xl mb-2">🐕</div>
+                <span class="text-slate-700 font-bold text-lg sm:text-xl">Perro</span>
+            </div>
+
+            <!-- Animal: Pez (Agua) -->
+            <div class="animal bg-white p-4 rounded-3xl shadow-lg border-b-4 border-slate-200 flex flex-col items-center justify-center w-32 h-32 sm:w-40 sm:h-40" 
+                 id="animal-fish" data-target="habitat-water" draggable="true">
+                <div class="text-5xl sm:text-7xl mb-2">🐠</div>
+                <span class="text-slate-700 font-bold text-lg sm:text-xl">Pez</span>
+            </div>
+        </section>
+
+        <!-- Zona de Hábitats (Destinos) -->
+        <section class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 w-full mt-4 flex-grow pb-10">
+            
+            <!-- Hábitat: Aire -->
+            <div class="habitat flex-1 bg-gradient-to-b from-sky-200 to-sky-400 rounded-[2rem] p-6 shadow-inner flex flex-col items-center justify-start min-h-[200px] relative overflow-hidden" 
+                 id="habitat-air" data-accept="animal-bird">
+                <!-- Decoración -->
+                <div class="absolute top-4 left-4 text-white opacity-50 text-4xl">☁️</div>
+                <div class="absolute top-10 right-8 text-white opacity-40 text-2xl">☁️</div>
+                
+                <h2 class="text-2xl font-bold text-sky-900 bg-white/40 px-6 py-2 rounded-full mb-4 z-10 shadow-sm backdrop-blur-sm">
+                    Aire
+                </h2>
+                <!-- Contenedor donde caerá el animal -->
+                <div class="drop-zone w-full h-full flex items-center justify-center relative z-10"></div>
+            </div>
+
+            <!-- Hábitat: Tierra -->
+            <div class="habitat flex-1 bg-gradient-to-b from-emerald-300 to-emerald-600 rounded-[2rem] p-6 shadow-inner flex flex-col items-center justify-start min-h-[200px] relative overflow-hidden" 
+                 id="habitat-land" data-accept="animal-dog">
+                <!-- Decoración -->
+                <div class="absolute bottom-2 left-2 text-3xl">🌿</div>
+                <div class="absolute bottom-4 right-4 text-4xl">🌲</div>
+                
+                <h2 class="text-2xl font-bold text-emerald-950 bg-white/40 px-6 py-2 rounded-full mb-4 z-10 shadow-sm backdrop-blur-sm">
+                    Tierra
+                </h2>
+                <div class="drop-zone w-full h-full flex items-center justify-center relative z-10"></div>
+            </div>
+
+            <!-- Hábitat: Agua -->
+            <div class="habitat flex-1 bg-gradient-to-b from-blue-400 to-blue-700 rounded-[2rem] p-6 shadow-inner flex flex-col items-center justify-start min-h-[200px] relative overflow-hidden" 
+                 id="habitat-water" data-accept="animal-fish">
+                <!-- Decoración -->
+                <div class="absolute bottom-4 left-4 text-3xl opacity-70">🫧</div>
+                <div class="absolute top-1/2 right-4 text-2xl opacity-50">🫧</div>
+                <div class="absolute bottom-0 text-white opacity-20 w-full text-center text-6xl">🌊</div>
+                
+                <h2 class="text-2xl font-bold text-blue-50 bg-black/20 px-6 py-2 rounded-full mb-4 z-10 shadow-sm backdrop-blur-sm">
+                    Agua
+                </h2>
+                <div class="drop-zone w-full h-full flex items-center justify-center relative z-10"></div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Pantalla de Éxito -->
+    <div id="celebration-overlay" class="fixed inset-0 bg-white/70 z-50 flex-col items-center justify-center">
+        <div class="bg-white p-8 rounded-[3rem] shadow-2xl border-4 border-emerald-400 text-center max-w-md mx-4 relative transform transition-transform scale-95 hover:scale-100">
+            <div class="text-8xl mb-4">🌟</div>
+            <h2 class="text-4xl font-bold text-emerald-600 font-['Comic_Neue'] mb-4">¡Excelente trabajo!</h2>
+            <p class="text-xl text-slate-600 mb-8">Has encontrado el hogar de todos los animales.</p>
+            <button onclick="resetGame()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xl py-3 px-8 rounded-full shadow-lg transition-transform hover:-translate-y-1 active:translate-y-0 w-full sm:w-auto">
+                ¡Jugar otra vez!
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const animals = document.querySelectorAll('.animal');
+        const habitats = document.querySelectorAll('.habitat');
+        const overlay = document.getElementById('celebration-overlay');
+        const animalsContainer = document.getElementById('animals-container');
+        
+        let matchedCount = 0;
+        const totalAnimals = animals.length;
+
+        // Variables para soporte táctil (Drag & Drop manual)
+        let draggedElement = null;
+        let initialX, initialY, currentX, currentY;
+        let originalParent = null;
+        let originalNextSibling = null;
+
+        // --- INICIO LÓGICA DRAG & DROP (RATÓN - HTML5 ESTÁNDAR) ---
+        animals.forEach(animal => {
+            // Eventos estándar de arrastre
+            animal.addEventListener('dragstart', dragStart);
+            animal.addEventListener('dragend', dragEnd);
+            
+            // Eventos táctiles
+            animal.addEventListener('touchstart', touchStart, { passive: false });
+        });
+
+        habitats.forEach(habitat => {
+            // Eventos estándar de destino
+            habitat.addEventListener('dragover', dragOver);
+            habitat.addEventListener('dragenter', dragEnter);
+            habitat.addEventListener('dragleave', dragLeave);
+            habitat.addEventListener('drop', drop);
+        });
+
+        function dragStart(e) {
+            // Solo permitir arrastrar si no está ya colocado
+            if (this.classList.contains('success')) {
+                e.preventDefault();
+                return;
+            }
+            draggedElement = this;
+            setTimeout(() => this.style.opacity = '0.5', 0);
+            
+            // Almacenar el ID del elemento arrastrado
+            e.dataTransfer.setData('text/plain', this.id);
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function dragEnd(e) {
+            this.style.opacity = '1';
+            draggedElement = null;
+            habitats.forEach(h => h.classList.remove('drag-over'));
+        }
+
+        function dragOver(e) {
+            e.preventDefault(); // Necesario para permitir el drop
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function dragEnter(e) {
+            e.preventDefault();
+            if (this.id === draggedElement?.dataset.target) {
+                this.classList.add('drag-over');
+            }
+        }
+
+        function dragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function drop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            const animalId = e.dataTransfer.getData('text/plain');
+            const animal = document.getElementById(animalId);
+            
+            if (animal && this.dataset.accept === animalId) {
+                handleMatch(animal, this);
+            } else if (animal) {
+                handleMismatch(animal);
+            }
+        }
+
+        // --- INICIO LÓGICA TOUCH (MÓVILES) ---
+        function touchStart(e) {
+            if (e.target.closest('.animal').classList.contains('success')) return;
+            
+            // Prevenir scroll
+            e.preventDefault();
+            
+            draggedElement = e.target.closest('.animal');
+            originalParent = draggedElement.parentNode;
+            originalNextSibling = draggedElement.nextSibling;
+            
+            // Guardar posición inicial del toque
+            initialX = e.touches[0].clientX;
+            initialY = e.touches[0].clientY;
+            
+            // Obtener posición actual del elemento
+            const rect = draggedElement.getBoundingClientRect();
+            
+            // Cambiar a posicionamiento absoluto para poder moverlo
+            draggedElement.style.position = 'fixed';
+            draggedElement.style.left = rect.left + 'px';
+            draggedElement.style.top = rect.top + 'px';
+            draggedElement.style.width = rect.width + 'px';
+            draggedElement.style.height = rect.height + 'px';
+            draggedElement.style.margin = '0';
+            
+            draggedElement.classList.add('dragging');
+            
+            document.addEventListener('touchmove', touchMove, { passive: false });
+            document.addEventListener('touchend', touchEnd);
+            document.addEventListener('touchcancel', touchEnd);
+        }
+
+        function touchMove(e) {
+            if (!draggedElement) return;
+            e.preventDefault();
+            
+            currentX = e.touches[0].clientX;
+            currentY = e.touches[0].clientY;
+            
+            const deltaX = currentX - initialX;
+            const deltaY = currentY - initialY;
+            
+            // Mover visualmente usando transform por rendimiento, 
+            // pero manteniendo el left/top inicial como base
+            draggedElement.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(1.1) rotate(-5deg)`;
+            
+            // Resaltar hábitat sobre el que pasamos
+            checkTouchOverlap(currentX, currentY);
+        }
+
+        function checkTouchOverlap(x, y) {
+            habitats.forEach(habitat => {
+                const rect = habitat.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    if (habitat.id === draggedElement.dataset.target) {
+                        habitat.classList.add('drag-over');
+                    }
+                } else {
+                    habitat.classList.remove('drag-over');
+                }
+            });
+        }
+
+        function touchEnd(e) {
+            if (!draggedElement) return;
+            document.removeEventListener('touchmove', touchMove);
+            document.removeEventListener('touchend', touchEnd);
+            document.removeEventListener('touchcancel', touchEnd);
+            const animal = draggedElement;
+            draggedElement = null;
+            animal.classList.remove('dragging');
+            animal.style.pointerEvents = 'none';
+            const point = e.changedTouches[0];
+            const target = e.type !== 'touchcancel' && point
+                ? document.elementFromPoint(point.clientX, point.clientY) : null;
+            const habitat = target ? target.closest('.habitat') : null;
+            animal.removeAttribute('style');
+            habitats.forEach(h => h.classList.remove('drag-over'));
+            if (habitat && habitat.dataset.accept === animal.id) {
+                handleMatch(animal, habitat);
+            } else if (e.type !== 'touchcancel') {
+                handleMismatch(animal);
+            }
+        }
+
+        // --- FUNCIONES COMUNES (Acierto/Fallo) ---
+        function handleMatch(animal, habitat) {
+            if (animal.classList.contains('success')) return;
+            // Insertar visualmente en la zona de drop
+            const dropZone = habitat.querySelector('.drop-zone');
+            dropZone.appendChild(animal);
+            
+            // Ajustar estilos del animal para que se vea bien dentro del hábitat
+            animal.classList.remove('w-32', 'h-32', 'sm:w-40', 'sm:h-40', 'border-b-4');
+            animal.classList.add('success', 'shadow-md');
+            animal.style.position = 'relative'; // Asegurar que quite el 'fixed' del touch
+            
+            // Efecto visual en el hábitat
+            habitat.classList.add('matched');
+            
+            // Crear mini-confeti en el lugar
+            createSparkles(habitat);
+            
+            // Quitar propiedad draggable
+            animal.setAttribute('draggable', 'false');
+            
+            matchedCount++;
+            
+            if (matchedCount === totalAnimals) {
+                setTimeout(showCelebration, 500);
+            }
+        }
+
+        function handleMismatch(animal) {
+            // Efecto de "no" (temblor)
+            animal.style.animation = 'shake 0.4s ease-in-out';
+            setTimeout(() => {
+                animal.style.animation = '';
+            }, 400);
+        }
+
+        // --- EFECTOS Y CELEBRACIÓN ---
+        function createSparkles(element) {
+            const rect = element.getBoundingClientRect();
+            for(let i = 0; i < 10; i++) {
+                const spark = document.createElement('div');
+                spark.innerHTML = '✨';
+                spark.style.position = 'absolute';
+                spark.style.left = Math.random() * 80 + 10 + '%';
+                spark.style.top = Math.random() * 80 + 10 + '%';
+                spark.style.fontSize = Math.random() * 1.5 + 0.5 + 'rem';
+                spark.style.pointerEvents = 'none';
+                spark.style.animation = `sparkle ${Math.random() * 0.5 + 0.5}s ease-out forwards`;
+                element.appendChild(spark);
+                
+                setTimeout(() => spark.remove(), 1000);
+            }
+        }
+
+        function showCelebration() {
+            overlay.classList.add('show');
+            shootConfetti();
+        }
+
+        function shootConfetti() {
+            const colors = ['#34d399', '#3b82f6', '#fcd34d', '#f472b6', '#a78bfa'];
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.classList.add('confetti');
+                
+                // Color aleatorio
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Posición inicial (centro de la pantalla superior)
+                confetti.style.left = '50%';
+                confetti.style.top = '20%';
+                
+                // Trayectoria aleatoria
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 150;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity + 100; // Gravedad hacia abajo
+                
+                confetti.animate([
+                    { transform: 'translate(0,0) rotate(0)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                ], {
+                    duration: 1000 + Math.random() * 1000,
+                    easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                    fill: 'forwards'
+                });
+                
+                overlay.appendChild(confetti);
+            }
+        }
+
+        function resetGame() {
+            overlay.classList.remove('show');
+            overlay.querySelectorAll('.confetti').forEach(c => c.remove());
+            matchedCount = 0;
+            draggedElement = null;
+            animals.forEach(animal => {
+                animal.removeAttribute('style');
+                animal.classList.remove('success', 'shadow-md', 'dragging');
+                animal.classList.add('w-32', 'h-32', 'sm:w-40', 'sm:h-40', 'border-b-4');
+                animal.setAttribute('draggable', 'true');
+                animalsContainer.appendChild(animal);
+            });
+            habitats.forEach(h => h.classList.remove('matched', 'drag-over'));
+        }
+    </script>
+</body>
+</html>
