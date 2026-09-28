@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Primer Dictado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f0fdf4;
+            background-image: radial-gradient(#bbf7d0 2px, transparent 2px);
+            background-size: 30px 30px;
+        }
+
+        .btn-press {
+            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-press:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0px 0 rgba(0,0,0,0.2);
+        }
+
+        /* Animación para el indicador de hablar */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+
+        .speaking-indicator {
+            position: relative;
+        }
+
+        .speaking-indicator::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: -10px;
+            right: -10px;
+            bottom: -10px;
+            border-radius: 50%;
+            border: 4px solid #3b82f6;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            display: none;
+        }
+
+        .speaking-indicator.is-speaking::before {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white max-w-lg w-full rounded-3xl shadow-xl border-4 border-green-400 p-6 md:p-10 text-center relative overflow-hidden">
+        
+        <!-- Decoración -->
+        <div class="absolute -top-10 -right-10 w-32 h-32 bg-yellow-300 rounded-full opacity-50"></div>
+        <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-300 rounded-full opacity-50"></div>
+
+        <div class="relative z-10">
+            
+            <a href="../../index.html" class="inline-block mb-4 text-blue-700 font-bold underline">← Todas las actividades</a>
+            <!-- Configuración -->
+            <div class="flex justify-end mb-4">
+                <label class="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-full cursor-pointer transition-colors border-2 border-gray-200 shadow-sm">
+                    <input type="checkbox" id="modo-texto" onchange="actualizarModo()" class="w-5 h-5 accent-green-500 cursor-pointer">
+                    <span class="text-sm md:text-base font-bold text-gray-700 select-none">Mostrar texto siempre</span>
+                </label>
+            </div>
+
+            <!-- Cabecera -->
+            <div class="mb-8">
+                <span class="text-6xl mb-4 block" id="icono-estado">🎧</span>
+                <h1 class="text-3xl md:text-4xl font-black text-gray-800 mb-2">Mis Dictados</h1>
+                <p class="text-gray-500 font-bold text-lg">Escucha y escribe en tu cuaderno</p>
+            </div>
+
+            <!-- Botón Principal -->
+            <button id="btn-empezar" onclick="nuevaFrase()" 
+                    class="btn-press w-full bg-green-500 hover:bg-green-600 text-white font-bold text-xl md:text-2xl py-4 px-8 rounded-2xl shadow-[0_6px_0_0_#166534] mb-6 flex items-center justify-center gap-3">
+                <span id="icono-btn">▶️</span>
+                <span id="texto-btn">Empezar a jugar</span>
+            </button>
+            <div id="controles-secundarios" class="hidden flex flex-wrap justify-center gap-3 mb-6">
+                <button onclick="repetirFrase()" class="btn-press bg-blue-600 text-white font-bold text-lg py-3 px-6 rounded-xl">🔊 Repetir frase</button>
+                <button onclick="mostrarTexto()" id="btn-ver-texto"
+                        class="btn-press bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold text-lg py-3 px-6 rounded-xl shadow-[0_4px_0_0_#a16207] flex items-center justify-center gap-2 transition-all">
+                    <span>👀</span> Ver texto
+                </button>
+            </div>
+
+            <!-- Pictogramas -->
+            <div id="contenedor-pictogramas" class="hidden mb-6 transition-all duration-500 transform scale-95 opacity-0">
+                <div class="bg-blue-50 border-4 border-blue-200 rounded-2xl p-4 flex justify-center items-center gap-4 text-5xl md:text-6xl shadow-inner min-h-[100px]">
+                    <span id="emojis-pantalla" class="tracking-widest filter drop-shadow-md"></span>
+                </div>
+            </div>
+
+            <!-- Pizarra de resultado -->
+            <div id="pizarra" class="hidden mt-6">
+                <div class="bg-gray-50 border-4 border-dashed border-gray-300 rounded-2xl p-6 transition-all duration-500">
+                    <p id="texto-pantalla" class="text-3xl md:text-4xl font-black text-pink-600 tracking-wide"></p>
+                </div>
+            </div>
+
+            <!-- Estado -->
+            <div class="mt-6 min-h-[2rem]">
+                <p id="estado" role="status" aria-live="polite" class="text-gray-500 font-bold text-lg animate-pulse">Toca el botón verde para empezar</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Array de frases (máximo 5 palabras, vocabulario sencillo y pictogramas asociados)
+        const frases = [
+            { texto: "El sol es muy grande.", emojis: "☀️ 🟡 ⬆️" },
+            { texto: "La gata bebe mucha leche.", emojis: "🐈 👅 🥛" },
+            { texto: "Juan come una manzana roja.", emojis: "👦 👄 🍎 🔴" },
+            { texto: "El perro corre por ahí.", emojis: "🐕 🏃 💨" },
+            { texto: "La casa tiene dos puertas.", emojis: "🏠 2️⃣ 🚪" },
+            { texto: "Me gusta jugar al balón.", emojis: "👍 ⚽" },
+            { texto: "Tengo un lápiz de color.", emojis: "✋ ✏️ 🌈" },
+            { texto: "Mamá lee un libro bonito.", emojis: "👩 📖 ✨" },
+            { texto: "Papá hace una tarta rica.", emojis: "👨 🎂 😋" },
+            { texto: "El cielo es muy azul.", emojis: "☁️ 🟦" },
+            { texto: "El coche rojo es rápido.", emojis: "🚗 🔴 ⚡" },
+            { texto: "Yo salto en el parque.", emojis: "🙋 ⬆️ 🌳" },
+            { texto: "La rana verde salta alto.", emojis: "🐸 🟩 ⬆️" },
+            { texto: "El pájaro canta al amanecer.", emojis: "🐦 🎶 🌅" },
+            { texto: "Mi oso es muy suave.", emojis: "🧸 ☁️" }
+        ];
+
+        let fraseActual = null;
+        let synth = window.speechSynthesis;
+        let reproduccion = 0;
+        let vocesDisponibles = [];
+
+        // Cargar voces disponibles (a veces requiere tiempo en cargar)
+        function cargarVoces() {
+            vocesDisponibles = synth ? synth.getVoices() : [];
+        }
+        cargarVoces();
+        if (synth && synth.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = cargarVoces;
+        }
+
+        function reproducir(texto) {
+            const turno = ++reproduccion;
+            if (!synth) {
+                document.getElementById('estado').innerText = "Este navegador no dispone de voz. Pulsa Ver texto.";
+                return;
+            }
+            // Detener cualquier audio previo
+            if (synth && synth.speaking) {
+                synth.cancel();
+            }
+
+            if (texto !== '') {
+                let utterThis = new SpeechSynthesisUtterance(texto);
+                
+                // Configurar voz: Español, velocidad 0.7
+                utterThis.lang = 'es-ES';
+                utterThis.rate = 0.7; 
+                utterThis.pitch = 1.1; 
+
+                // Intentar forzar una voz específica de España si está disponible
+                const vozEspaña = vocesDisponibles.find(voz => voz.lang === 'es-ES');
+                if (vozEspaña) {
+                    utterThis.voice = vozEspaña;
+                }
+
+                // Eventos de la interfaz
+                utterThis.onstart = function () {
+                    if (turno !== reproduccion) return;
+                    document.getElementById('estado').innerText = "🔊 Escucha con atención...";
+                    document.getElementById('estado').classList.add('text-blue-500');
+                    document.getElementById('estado').classList.remove('text-gray-500', 'text-green-500');
+                    document.getElementById('icono-estado').classList.add('speaking-indicator', 'is-speaking');
+                }
+                
+                utterThis.onend = function () {
+                    if (turno !== reproduccion) return;
+                    document.getElementById('estado').innerText = "✅ ¡Ahora escríbelo!";
+                    document.getElementById('estado').classList.remove('text-blue-500');
+                    document.getElementById('estado').classList.add('text-green-500');
+                    document.getElementById('icono-estado').classList.remove('speaking-indicator', 'is-speaking');
+                }
+
+                utterThis.onerror = function(event) {
+                    if (turno !== reproduccion) return;
+                    console.error('Error de síntesis de voz', event);
+                    document.getElementById('estado').innerText = "⚠️ Hubo un error al reproducir.";
+                    document.getElementById('icono-estado').classList.remove('speaking-indicator', 'is-speaking');
+                }
+
+                // Eliminamos el setTimeout para cumplir con las políticas de seguridad de navegadores móviles
+                synth.speak(utterThis);
+            }
+        }
+
+        function actualizarModo() {
+            const verSiempre = document.getElementById('modo-texto').checked;
+            
+            // Ocultar o mostrar el botón de revelar texto según el modo
+            if (verSiempre) {
+                document.getElementById('btn-ver-texto').classList.add('hidden');
+                // Si hay una frase activa, mostrar la pizarra inmediatamente
+                if (fraseActual) {
+                    document.getElementById('pizarra').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('btn-ver-texto').classList.remove('hidden');
+                // Si estamos en modo dictado normal (oculto), escondemos la pizarra
+                if (fraseActual) {
+                    document.getElementById('pizarra').classList.add('hidden');
+                }
+            }
+        }
+
+        function nuevaFrase() {
+            // Seleccionar una frase aleatoria
+            const indice = Math.floor(Math.random() * frases.length);
+            fraseActual = frases[indice];
+
+            // 1. Mostrar pictogramas
+            const contenedorPicto = document.getElementById('contenedor-pictogramas');
+            document.getElementById('emojis-pantalla').innerText = fraseActual.emojis;
+            contenedorPicto.classList.remove('hidden');
+            
+            // Animación suave de entrada
+            setTimeout(() => {
+                contenedorPicto.classList.remove('scale-95', 'opacity-0');
+                contenedorPicto.classList.add('scale-100', 'opacity-100');
+            }, 50);
+
+            // 2. Gestionar la pizarra de texto
+            const verSiempre = document.getElementById('modo-texto').checked;
+            document.getElementById('texto-pantalla').innerText = fraseActual.texto;
+            
+            if (verSiempre) {
+                document.getElementById('pizarra').classList.remove('hidden');
+            } else {
+                document.getElementById('pizarra').classList.add('hidden');
+            }
+            
+            // EL ERROR ESTABA AQUÍ: Se buscaba un ID que no existe, causando que la función se rompiera antes de reproducir audio.
+            // Solución: Añadimos un comprobador para evitar que JS arroje un error.
+            const controlesSecundarios = document.getElementById('controles-secundarios');
+            if (controlesSecundarios) {
+                controlesSecundarios.classList.remove('hidden');
+            }
+            
+            document.getElementById('texto-btn').innerText = "Siguiente frase";
+            document.getElementById('icono-btn').innerText = "⏭️";
+
+            // Hablar
+            reproducir(fraseActual.texto);
+        }
+
+        function repetirFrase() {
+            if (!fraseActual) return;
+            // No ocultamos el texto si está activado "Mostrar texto siempre"
+            const verSiempre = document.getElementById('modo-texto').checked;
+            if (!verSiempre) {
+                document.getElementById('pizarra').classList.add('hidden');
+            }
+            reproducir(fraseActual.texto);
+        }
+
+        function mostrarTexto() {
+            if (!fraseActual) return;
+            reproduccion++;
+            // Mostrar la pizarra con el texto y detener el audio si sigue hablando
+            if (synth && synth.speaking) {
+                synth.cancel();
+            }
+            document.getElementById('pizarra').classList.remove('hidden');
+            document.getElementById('estado').innerText = "¡Comprueba si lo has escrito bien! 🌟";
+            document.getElementById('estado').classList.add('text-pink-500');
+            document.getElementById('estado').classList.remove('text-green-500', 'text-blue-500');
+            document.getElementById('icono-estado').classList.remove('speaking-indicator', 'is-speaking');
+        }
+    </script>
+</body>
+</html>
